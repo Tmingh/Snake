@@ -1,6 +1,3 @@
-//
-// Created by minghua on 15-12-27.
-//
 
 #ifndef NEW_SNAKE_SNAKE_H
 #define NEW_SNAKE_SNAKE_H
@@ -14,7 +11,6 @@ enum {
     UP, DOWN, RIGHT, LEFT
 }direction;
 
-/*蛇的结构体*/
 struct node {
     int x;
     int y;
@@ -23,5 +19,14 @@ struct node {
     struct node *next;
 }*head, *tail;
 typedef struct node Node;
+
+struct object {
+    int x;
+    int y;
+    struct object *next;
+}*map_wall, *all_grass, *all_bomb;
+typedef struct object Wall;
+typedef struct object Grass;
+typedef struct object Bomb;
 
 #endif //NEW_SNAKE_SNAKE_H
