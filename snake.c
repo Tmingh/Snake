@@ -1,5 +1,6 @@
 
-#include "snake.h"
+#include "snake_struct.h"
+#include "snake_function.h"
 #include "cJSON.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,9 +8,18 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_ttf.h>
 
 SDL_Window *gWindow;
 SDL_Renderer *gRenderer;
+SDL_Surface *textSurface;
+SDL_Texture *button_main[4];
+SDL_Texture *button_snake[4];
+SDL_Color blackColor = {0, 0, 0};
+SDL_Color redColor = {255, 0 ,0};
+TTF_Font *textFont;
+
+int continue_flag = -1;
 int act_flag = -1;
 int move_flag = -1;
 int grass_count = 0;
@@ -18,55 +28,142 @@ int goal = 1;
 int food_x;
 int food_y;
 
-
-int snake_init();
-int sdl_init();
-int snake_action();
-int snake_move();
-int snake_draw();
-int snake_food();
-int snake_grass();
-int snake_bomb();
-int snake_bite_self();
-int snake_bump_wall();
-
-int food_action();
-int food_eat();
-int food_init();
-int food_draw();
-
-int wall_build();
-int wall_read();
-int wall_write();
-int wall_draw();
-
-int grass_action();
-int grass_eat();
-int grass_init();
-int grass_draw();
-
-int bomb_action();
-int bomb_eat();
-int bomb_init();
-int bomb_draw();
-
 int main()
 {
-    bool quit = false;
-    SDL_Event e;
     sdl_init();
+    menu_main();
+}
+
+int menu_main()
+{
+    int flag = -1;
+    int i;
+    SDL_Event e;
+    SDL_Rect button[4];
+
+    for (i = 0; i < 4; i++){
+        button[i].w = BUTTON_WIDTH;
+        button[i].h = BUTTON_HEIGHT;
+        button[i].x = (WINDOW_WIDTH - BUTTON_WIDTH) / 2;
+        button[i].y = (i * 2 + 1) * (WINDOW_HEIGHT/4 - BUTTON_HEIGHT)/2;
+    }
+
+    SDL_SetRenderDrawColor(gRenderer, 0xff, 0xff, 0xff, 0xff);
+    SDL_RenderClear( gRenderer );
+    text_set();
+    while (1)
+    {
+        while (SDL_PollEvent(&e) != NULL){
+            if (e.type == SDL_QUIT){
+                //close_game();
+                exit(0);
+            }
+            else if (e.type == SDL_MOUSEMOTION || e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP){
+                int x, y;
+                SDL_GetMouseState(&x, &y);
+                for (i = 0; i < 4; i++) {
+                    if (x < button[i].x + button[i].w && x > button[i].x &&
+                            y < button[i].y + button[i].h && y > button[i].y){
+                        flag = i;
+                    }
+                }
+                if (flag != -1){
+                    switch (e.type) {
+                        case SDL_MOUSEMOTION:
+                            mouse_motion(flag);
+                            break;
+                        case SDL_MOUSEBUTTONUP:
+                            mouse_down(flag);
+                            break;
+                    }
+                } else {
+                    switch (e.type){
+                        case SDL_MOUSEMOTION:
+                            text_set();
+                            break;
+                    }
+                }
+                flag = -1;
+            }
+        }
+        for (i = 0; i< 4; i++) {
+            SDL_RenderCopy(gRenderer, button_main[i], 0, &(button[i]));
+        }
+        SDL_RenderPresent(gRenderer);
+    }
+}
+
+int mouse_motion(int x)
+{
+    if (x == 0){
+        textSurface = TTF_RenderText_Solid(textFont, "Start", redColor);
+        button_main[0] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+    }
+    else if (x == 1){
+        textSurface = TTF_RenderText_Solid(textFont, "Continue", redColor);
+        button_main[1] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+    }
+    else if (x == 2){
+        textSurface = TTF_RenderText_Solid(textFont, "Rank", redColor);
+        button_main[2] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+    }
+    else if (x == 3){
+        textSurface = TTF_RenderText_Solid(textFont, "Quit", redColor);
+        button_main[3] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+    }
+    return 0;
+}
+
+int mouse_down(int x)
+{
+    if (x == 0) {
+        snake_main();
+    }
+    else if (x == 1){
+        //snake_load();
+    }
+    else if (x == 2){
+        //check_rank();
+    }
+    else if (x == 3){
+        exit(0);
+    }
+}
+
+int text_set()
+{
+    textSurface = TTF_RenderText_Solid(textFont, "Start", blackColor);
+    button_main[0] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+
+    textSurface = TTF_RenderText_Solid(textFont, "Continue", blackColor);
+    button_main[1] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+
+    textSurface = TTF_RenderText_Solid(textFont, "Rank", blackColor);
+    button_main[2] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+
+    textSurface = TTF_RenderText_Solid(textFont, "Quit", blackColor);
+    button_main[3] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+
+    return 0;
+}
+
+
+int snake_main()
+{
+    SDL_Event e;
     snake_init();
     srand((unsigned)time(NULL));
     all_grass = (Grass *)malloc(sizeof(Grass));
     all_grass->next = NULL;
     all_bomb = (Bomb *)malloc(sizeof(Bomb));
     all_bomb->next = NULL;
-    while (!quit)
+    while (1)
     {
         while (SDL_PollEvent(&e) != NULL)
         {
             if (e.type == SDL_QUIT){
-                quit = true;
+                //close_game();
+                exit(0);
             }
             if (act_flag == 0) {
                 switch (e.key.keysym.sym) {
@@ -94,12 +191,14 @@ int main()
                             move_flag = 0;
                         }
                         break;
+                    case SDLK_ESCAPE:
+                        snake_menu();
+                        break;
                 }
                 act_flag = -1;
             }
-
         }
-        SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xff);
+        SDL_SetRenderDrawColor(gRenderer, 0xff, 0xff, 0xff, 0xff);
         SDL_RenderClear(gRenderer);
 
         wall_build();
@@ -112,19 +211,135 @@ int main()
         SDL_RenderPresent(gRenderer);
         SDL_Delay(300);
     }
+}
+
+int snake_menu()
+{
+    int i;
+    int flag = -1;
+    SDL_Rect button[4];
+    SDL_Event e;
+
+    for (i = 0; i < 4; i++){
+        button[i].w = BUTTON_WIDTH;
+        button[i].h = BUTTON_HEIGHT;
+        button[i].x = (WINDOW_WIDTH - BUTTON_WIDTH) / 2;
+        button[i].y = (i * 2 + 1) * (WINDOW_HEIGHT/4 - BUTTON_HEIGHT)/2;
+    }
+    snake_text_set();
+    while(1) {
+        while (SDL_PollEvent(&e) != NULL) {
+            if (e.type == SDL_QUIT) {
+                //close_game();
+                exit(0);
+            }
+            else if (e.type == SDL_MOUSEMOTION || e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) {
+                int x, y;
+                SDL_GetMouseState(&x, &y);
+                for (i = 0; i < 4; i++) {
+                    if (x < button[i].x + button[i].w && x > button[i].x &&
+                        y < button[i].y + button[i].h && y > button[i].y) {
+                        flag = i;
+                    }
+                }
+                if (flag != -1) {
+                    switch (e.type) {
+                        case SDL_MOUSEMOTION:
+                            snake_mouse_motion(flag);
+                            break;
+                        case SDL_MOUSEBUTTONUP:
+                            snake_mouse_down(flag);
+                            break;
+                    }
+                } else {
+                    switch (e.type) {
+                        case SDL_MOUSEMOTION:
+                            snake_text_set();
+                            break;
+                    }
+                }
+                flag = -1;
+            }
+        }
+        if (continue_flag == 0){
+            continue_flag = -1;
+            return 0;
+        }
+        for (i = 0; i < 4; i++) {
+            SDL_RenderCopy(gRenderer, button_snake[i], 0, &(button[i]));
+        }
+        SDL_RenderPresent(gRenderer);
+    }
+}
+
+int snake_mouse_motion(int x)
+{
+    if (x == 0){
+        textSurface = TTF_RenderText_Solid(textFont, "Continue", redColor);
+        button_snake[0] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+    }
+    else if (x == 1){
+        textSurface = TTF_RenderText_Solid(textFont, "Save", redColor);
+        button_snake[1] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+    }
+    else if (x == 2){
+        textSurface = TTF_RenderText_Solid(textFont, "Back", redColor);
+        button_snake[2] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+    }
+    else if (x == 3){
+        textSurface = TTF_RenderText_Solid(textFont, "Quit", redColor);
+        button_snake[3] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+    }
     return 0;
 }
+
+int snake_mouse_down(int x)
+{
+    if (x == 0) {
+        continue_flag = 0;
+    }
+    else if (x == 1){
+        snake_save();
+    }
+    else if (x == 2){
+        move_flag = -1;
+        menu_main();
+    }
+    else if (x == 3){
+        exit(0);
+    }
+}
+
+int snake_text_set()
+{
+    textSurface = TTF_RenderText_Solid(textFont, "Continue", blackColor);
+    button_snake[0] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+
+    textSurface = TTF_RenderText_Solid(textFont, "Save", blackColor);
+    button_snake[1] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+
+    textSurface = TTF_RenderText_Solid(textFont, "Back", blackColor);
+    button_snake[2] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+
+    textSurface = TTF_RenderText_Solid(textFont, "Quit", blackColor);
+    button_snake[3] = SDL_CreateTextureFromSurface(gRenderer, textSurface);
+}
+
 
 int sdl_init()
 {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
     gWindow = SDL_CreateWindow("Snake", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                               WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
+                               WINDOW_WIDTH+200, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
     gRenderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED);
     SDL_SetRenderDrawColor(gRenderer, 0xff, 0xff, 0xff, 0xff);
     int imgFlags = IMG_INIT_PNG;
     IMG_Init(imgFlags);
+    TTF_Init();
+    textFont = TTF_OpenFont("font/lazy.ttf", 80);
+
+    return 0;
 }
 
 int snake_init()
@@ -192,6 +407,63 @@ int snake_move()
         head->x -= NODE_WIDTH;
     }
     return 0;
+}
+
+int snake_save()
+{
+    char *str;
+    Node *temp_snake = head;
+    Grass *temp_grass = all_grass->next;
+    Bomb *temp_bomb = all_bomb->next;
+    FILE *fp = fopen("/home/minghua/ClionProjects/new_snake/save/save.json", "w");
+
+    cJSON *root = cJSON_CreateArray();
+    cJSON *snake = cJSON_CreateArray();
+    cJSON *food = cJSON_CreateArray();
+    cJSON *grass = cJSON_CreateArray();
+    cJSON *bomb = cJSON_CreateArray();
+
+    cJSON_AddItemToArray(root, snake);
+    cJSON_AddItemToArray(root, food);
+    cJSON_AddItemToArray(root, grass);
+    cJSON_AddItemToArray(root, bomb);
+
+    while (temp_snake != NULL) {
+        cJSON *snake_node = cJSON_CreateObject();
+        cJSON_AddNumberToObject(snake_node, "x", temp_snake->x);
+        cJSON_AddNumberToObject(snake_node, "y", temp_snake->y);
+        cJSON_AddItemToArray(snake, snake_node);
+
+        temp_snake = temp_snake->next;
+    }
+
+    cJSON *food_save = cJSON_CreateObject();
+    cJSON_AddNumberToObject(food_save, "x", food_x);
+    cJSON_AddNumberToObject(food_save, "y", food_y);
+    cJSON_AddItemToArray(food, food_save);
+
+    while (temp_grass != NULL) {
+        cJSON *grass_node = cJSON_CreateObject();
+        cJSON_AddNumberToObject(grass_node, "x", temp_grass->x);
+        cJSON_AddNumberToObject(grass_node, "y", temp_grass->y);
+        cJSON_AddItemToArray(grass, grass_node);
+
+        temp_grass = temp_grass->next;
+    }
+
+    while (temp_bomb != NULL) {
+        cJSON *bomb_node = cJSON_CreateObject();
+        cJSON_AddNumberToObject(bomb_node, "x", temp_bomb->x);
+        cJSON_AddNumberToObject(bomb_node, "y", temp_bomb->y);
+        cJSON_AddItemToArray(bomb, bomb_node);
+
+        temp_bomb = temp_bomb->next;
+    }
+
+
+    str = cJSON_Print(root);
+    fputs(str, fp);
+    fclose(fp);
 }
 
 int snake_bite_self()
@@ -466,13 +738,19 @@ int grass_init()
     int grass_mount, i;
     Grass *temp_grass, *p;
     Wall *temp_wall;
-    temp_grass = (Grass *)malloc(sizeof(Grass));
-    all_grass->next = temp_grass;
     grass_mount = rand() % 4 + 3;
     for (i = 0; i < grass_mount; i++){
-        temp_wall = map_wall;
+        temp_grass = (Grass *)malloc(sizeof(Grass));
+        temp_grass->next = NULL;
+        if (i == 0){
+            all_grass->next = temp_grass;
+        } else {
+            p->next = temp_grass;
+        }
         temp_grass->x = rand() % 32 * 20;
         temp_grass->y = rand() % 24 * 20;
+
+        temp_wall = map_wall;
         while (temp_wall != NULL){
             if ((temp_grass->x == temp_wall->x && temp_grass->y == temp_wall->y) ||
                     (food_x == temp_grass->x && food_y == temp_grass->y)){
@@ -483,10 +761,7 @@ int grass_init()
                 temp_wall = temp_wall->next;
             }
         }
-        p = (Grass *)malloc(sizeof(Grass));
-        p->next = NULL;
-        temp_grass->next = p;
-        temp_grass = p;
+        p = temp_grass;
     }
     return 0;
 }
@@ -546,14 +821,20 @@ int bomb_init()
     int bomb_mount, i;
     Grass *temp_grass, *temp_bomb, *p;
     Wall *temp_wall;
-    temp_bomb = (Bomb *)malloc(sizeof(Bomb));
-    all_bomb->next = temp_bomb;
     bomb_mount = rand() % 3 + 2;
     for (i = 0; i < bomb_mount; i++){
-        temp_wall = map_wall;
+        temp_bomb = (Bomb *)malloc(sizeof(Bomb));
+        temp_bomb->next = NULL;
+        if (i == 0){
+            all_bomb->next = temp_bomb;
+        } else {
+            p->next = temp_bomb;
+        }
         temp_grass = all_grass->next;
-        temp_bomb->x = 20;//rand() % 32 * 20;
-        temp_bomb->y = 0;//rand() % 24 * 20;
+        temp_bomb->x = rand() % 32 * 20;
+        temp_bomb->y = rand() % 24 * 20;
+
+        temp_wall = map_wall;
         while (temp_grass  != NULL){
             while (temp_wall != NULL){
                 if ((temp_bomb->x == temp_wall->x && temp_bomb->y == temp_wall->y) ||
@@ -569,10 +850,8 @@ int bomb_init()
             }
             temp_grass = temp_grass->next;
         }
-        p = (Bomb *)malloc(sizeof(Bomb));
-        p->next = NULL;
-        temp_bomb->next = p;
-        temp_bomb = p;
+
+        p = temp_bomb;
     }
     return 0;
 }
